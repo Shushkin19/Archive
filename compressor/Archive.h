@@ -13,6 +13,7 @@ class archive  {
 	std::string file;
 	std::string file_compressed;
 	std::string file_type;
+	std::string what_is;
 
 	std::unordered_map<unsigned char, Letter> code_book;
 	std::unordered_map<std::string, Letter> byte_book;
@@ -26,9 +27,11 @@ class archive  {
 	void show_for_debug();
 	void show_code_book();
 	void rebuild_file_from_code_book();
-	unsigned char make_byte(std::vector<bool> bits, int start);
 	void write_code_book_in_file();
 	inline std::string to_bit_str(unsigned char ch);
+
+	void good_name(std::string& fl);
+
 	//decompress
 	void fill_data();
 	void create_decompress_file();
@@ -38,8 +41,9 @@ public:
 	~archive();
 	void compress_file();
 	void decompress_file();
+	void work();
 
-	//std::fstream get_compressed_file();
+
 
 };
 

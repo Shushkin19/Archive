@@ -17,7 +17,6 @@ public:
 	bool operator==(const Letter& l);
 	const bool operator<(const Letter& l);
 	const bool operator>(const Letter& l);
-	Letter& operator+(const Letter& l);
 	friend std::ostream& operator<<(std::ostream& ost, const Letter& l);
 };
 

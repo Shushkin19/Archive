@@ -5,18 +5,27 @@
 #include<iostream>
 #include"huffman_tree.h"
 
-
 using namespace std;
+
 
 
 archive::archive(std::string file_name) {
 	data.resize(256);
 	file = file_name;
 	base_data_size = 0;
+	if (file_name.find('.') != string::npos) {
+		what_is.assign(file_name, file_name.find('.'));
+	}
+	else {
+		cout << "Unknown file format\n";
+		exit(-1);
+	}
 }
 
 archive::~archive() {
 	data.clear();
+	code_book.clear();
+	byte_book.clear();
 }
 
 void archive::show_for_debug() {
@@ -27,16 +36,13 @@ void archive::show_for_debug() {
 
 void archive::read_file_to_data() {
 
-
 	std::fstream file_to_compress;
 
 	file_to_compress.open(file, std::ios::binary | std::ios::in);
 
 	if (file_to_compress.is_open() == 0) {
-		std::cout << "file not opened!";
-		exit(-1);
+		throw(string("Unable to open file for compression"));
 	}
-	
 	unsigned char c;
 	
 	while (!file_to_compress.eof()) {
@@ -48,14 +54,17 @@ void archive::read_file_to_data() {
 	}
 
 	sort_data();
+	
 	file_to_compress.close();
+
 }
 
 void archive::sort_data() {
 	std::sort(data.begin(), data.end(),std::greater<>());
 	if (data.size() < 1) {
-		exit(-1);
+		throw(string("File is empty"));
 	}
+
 	int tmp = data.size() - 1;
 	while (data[tmp].freq == 0) {
 		data.pop_back();
@@ -68,7 +77,7 @@ int archive::size_file_in_byte(std::string s)
 	std::fstream fl;
 	fl.open(s, std::ios::binary | std::ios::in);
 	if (fl.is_open() == 0) {
-		//не открыт ,  ошибка
+		throw(string("Unable to open file"));
 	}
 
 	long count_byte = 0;
@@ -86,23 +95,11 @@ void archive::show_code_book() {
 	}
 }
 
-unsigned char archive::make_byte(std::vector<bool> bits,int start) {
-	//byte::put_bit();
-	//byte::get_byte();
-	int res = 0;
-	for (int i = 0; i < 8; i++) {
-		if (bits[start+i] == 1) {
-			res += std::pow(2, 8 - i - 1);
-		}
-	}
-	return res;
-}
-
 void archive::write_code_book_in_file() {
 	std::fstream fl;
 	fl.open(file_compressed, std::ios::binary | std::ios::out );
 	if (fl.is_open() == 0) {
-		//bad!
+		throw(string("Unable to open file for write code book\n"));
 	}
 	file_type.assign(file, file.find('.'));
 	fl << file_type;
@@ -118,7 +115,9 @@ void archive::rebuild_file_from_code_book() {
 	std::fstream filecomp;
 
 	filecomp.open(file, std::ios::binary | std::ios::in);
-
+	if (filecomp.is_open() == 0) {
+		throw(string("Unable to open file comp..."));
+	}
 	std::fstream compress_file;
 
 	std::string name;
@@ -127,14 +126,7 @@ void archive::rebuild_file_from_code_book() {
 
 	compress_file.open(file_compressed, std::ios::binary | std::ios::out | std::ios::app);
 	if (compress_file.is_open() == 0) {
-		std::cout << "file compress not opened\n";
-		exit(-1);
-	}
-
-
-	if (filecomp.is_open() == 0) {
-		std::cout << "file not opened!";
-		exit(-1);
+		throw(string("Unable to open new file "));
 	}
 
 	write_code_book_in_file();
@@ -145,11 +137,8 @@ void archive::rebuild_file_from_code_book() {
 	int count = 0;
 	while (!filecomp.eof()) {
 		auto it = code_book.find(filecomp.get());
-		for (int i = 0; i < it->second.byte_code.size(); ++i) {
-//			int b = (it->second.byte_code[i]);
-	
+		for (int i = 0; i < it->second.byte_code.size(); ++i) {	
 			int bit = it->second.byte_code[i] - '0';
-			
 			if (bit == 1) {
 				byte = byte << 1;
 				byte |= 1;
@@ -157,9 +146,6 @@ void archive::rebuild_file_from_code_book() {
 			else {
 				byte <<= 1;
 			}
-			
-
-//			byte << (it->second.byte_code[i] % 2);
 			++count;
 			if (count == 8) {
 				compress_file << byte;
@@ -173,28 +159,42 @@ void archive::rebuild_file_from_code_book() {
 
 
 void archive::compress_file() {
+	cout << "Compressing . . .\n";
 
-	huffman_tree h_tree;
+	try {
+		huffman_tree h_tree;
 
-	read_file_to_data();
+		read_file_to_data();
 
-	//show_for_debug();
+		h_tree.insert(data);
 
-	h_tree.insert(data);
+		h_tree.create_bytes(&h_tree, nullptr);
 
-	h_tree.create_bytes(&h_tree, nullptr);
-	//h_tree.show(&h_tree, nullptr);
+		h_tree.get_bytecode(&h_tree, nullptr, code_book);
 
-	h_tree.get_bytecode(&h_tree, nullptr, code_book);
-//	show_code_book();
+		rebuild_file_from_code_book();
+		cout << "The file is compressed\n";
+		std::cout << "Based size: " << base_data_size << " Byte \nCompressed size: " << size_file_in_byte(file_compressed) << " Byte\n";
+	}
+	catch (string e) {
+		cout << e;
+	}
+	
 
-	rebuild_file_from_code_book();
-
-	std::cout << "\n Based size: " << base_data_size << " Byte \n Compressed size: " << size_file_in_byte(file_compressed) << " Byte\n";
 	
 	
 }
 
+
+void archive::good_name(std::string& fl) {
+	for (auto it = fl.end(); *it != '\\'; --it) {
+		if (it == fl.begin()) {
+			return;
+		}
+	}
+	string g;
+	g = fl;
+}
 
 inline std::string archive::to_bit_str(unsigned char ch) {
 	unsigned char bit = 1;
@@ -217,12 +217,11 @@ inline std::string archive::to_bit_str(unsigned char ch) {
 
 }
 
-void archive::fill_data() {
+inline void archive::fill_data() {
 	fstream fl;
 	fl.open(file, ios::binary | ios::in);
 	if (fl.is_open() == 0) {
-		//pook!
-		cout << "xexe";
+		throw(string("Unable to open file fld"));
 	}
 	size_t tmp = fl.get();
 	
@@ -260,7 +259,6 @@ void archive::fill_data() {
 	pos = fl.tellg();
 	sort_data();
 	fl.close();
-	//show_code_book();
 
 }
 
@@ -275,17 +273,18 @@ void archive::create_decompress_file() {
 	fstream fl;
 	fl.open(file, ios::binary | ios::app | ios::in);
 	if (fl.is_open() == 0) {
-		//bad!
+		throw(string("Unable to open file read"));
 	}
 
-	std::string name;
+	string name;
 	name = file.substr(0, file.find('.'));
-	name = "decomp_" + name + file_type;
+	name =  name +"_decomp"+ file_type;
 
 	fstream file_decomp;
-	file_decomp.open(name, ios::binary | ios::out);
+	file_decomp.open(name, ios::binary | ios::out | ios::app);
 	if (file_decomp.is_open() == 0) {
-		cout << "bsd";
+		cout << name<<endl;
+		throw(string("Unable to open file decomp_"));
 	}
 
 
@@ -319,20 +318,34 @@ void archive::create_decompress_file() {
 
 
 void archive::decompress_file() {
-	
-	fill_data();
+	cout << "Decompressing . . . \n";
+	try {
+		fill_data();
 
-	huffman_tree h_tree;
+		huffman_tree h_tree;
 
-	h_tree.insert(data);
+		h_tree.insert(data);
 
-	h_tree.create_bytes(&h_tree, nullptr);
-	//h_tree.show(&h_tree, nullptr);
+		h_tree.create_bytes(&h_tree, nullptr);
 
-	h_tree.get_bytecode(&h_tree, nullptr, code_book);
-	//show_code_book();
-	create_decompress_file();
-	
 
-	//show_for_debug();
+		h_tree.get_bytecode(&h_tree, nullptr, code_book);
+
+		create_decompress_file();
+		cout << "The file is decompressed\n";
+	}
+	catch (string e) {
+		cout << e << ":'" << file << "'";
+	}
+
+
+}
+
+void archive::work() {
+	if (what_is == ".shuco") {
+		decompress_file();
+	}
+	else {
+		compress_file();
+	}
 }
